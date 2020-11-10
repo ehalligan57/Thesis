@@ -11,6 +11,8 @@ setwd(as.character(currentDirName))
 
 
 ########## Arrange The Data ########## 
+
+#This is the data for the plot I sent you
 geneExpressionValuesSensitiveCellLine1 <- c(50,43,55,57)
 geneExpressionValuesSensitiveCellLine2 <- c(60,53,65,67)
 geneExpressionValuesSensitiveCellLine3 <- c(70,63,75,77)
@@ -30,6 +32,27 @@ percentControlGrowthResistantCellLine1 <- 91
 percentControlGrowthResistantCellLine2 <- 90
 percentControlGrowthResistantCellLine3 <- 89
 percentControlGrowthResistantCellLine4 <- 85
+
+#If you run this chunk instead, it will generate random data (and should always give r close to 0, p > 0.05)
+geneExpressionValuesSensitiveCellLine1 <- runif(4, min = 0, max = 500)
+geneExpressionValuesSensitiveCellLine2 <- runif(4, min = 0, max = 500)
+geneExpressionValuesSensitiveCellLine3 <- runif(4, min = 0, max = 500)
+geneExpressionValuesSensitiveCellLine4 <- runif(4, min = 0, max = 500)
+
+geneExpressionValuesResistantCellLine1 <- runif(4, min = 0, max = 500)
+geneExpressionValuesResistantCellLine2 <- runif(4, min = 0, max = 500)
+geneExpressionValuesResistantCellLine3 <- runif(4, min = 0, max = 500)
+geneExpressionValuesResistantCellLine4 <- runif(4, min = 0, max = 500)
+
+percentControlGrowthSensitiveCellLine1 <- runif(1, min = 0, max = 100)
+percentControlGrowthSensitiveCellLine2 <- runif(1, min = 0, max = 100)
+percentControlGrowthSensitiveCellLine3 <- runif(1, min = 0, max = 100)
+percentControlGrowthSensitiveCellLine4 <- runif(1, min = 0, max = 100)
+
+percentControlGrowthResistantCellLine1 <- runif(1, min = 0, max = 100)
+percentControlGrowthResistantCellLine2 <- runif(1, min = 0, max = 100)
+percentControlGrowthResistantCellLine3 <- runif(1, min = 0, max = 100)
+percentControlGrowthResistantCellLine4 <- runif(1, min = 0, max = 100)
 
 sensitiveCellLine1 <- data.frame("cellLineName" = "Sensitive1", "geneExpression" = geneExpressionValuesSensitiveCellLine1, "percentControlGrowth" = percentControlGrowthSensitiveCellLine1)
 sensitiveCellLine2 <- data.frame("cellLineName" = "Sensitive2", "geneExpression" = geneExpressionValuesSensitiveCellLine2, "percentControlGrowth" = percentControlGrowthSensitiveCellLine2)
@@ -65,6 +88,7 @@ plot4 <- ggplot(cellLineData, aes(x = geneExpression, y = percentControlGrowth, 
   geom_abline(intercept = intercept, slope = slope) +
   labs(title = sprintf("r value = %.3s, P-val = %.2e", linearRegressionrValue, linearRegressionPval)) +
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
 
 ggsave("Large r and large pval.pdf", plot4, device = "pdf")
 
