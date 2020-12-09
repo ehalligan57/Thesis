@@ -3,7 +3,6 @@
 #Genomic predictors of interindividual differences in response to DNA damaging agents 
 
 ########## Load Packages ########## 
-#import data.table
 library(data.table)
 library(tidyverse)
 
@@ -103,7 +102,7 @@ for (GeneIndex in 1:length(UniqueGeneSymbol)){
   AverageHigh <- mean(as.matrix(TrainingPopulation[LogicalUniqueGenes,2:5]))
   AverageLow <- mean(as.matrix(TrainingPopulation[LogicalUniqueGenes,10:13]))
   TrainingDataFilteringValues$FoldDifference[GeneIndex] <- abs(AverageHigh/AverageLow)
-  TrainingDataFilteringValues$TtestPvalue[GeneIndex] <- (t.test(TrainingPopulation[LogicalUniqueGenes,2:5],TrainingPopulation[LogicalUniqueGenes,10:13], var.equal = TRUE))$p.value
+  TrainingDataFilteringValues$TtestPvalue[GeneIndex] <- (t.test(TrainingPopulation[LogicalUniqueGenes,2:5],TrainingPopulation[LogicalUniqueGenes,10:13], var.equal = FALSE))$p.value
   linearRegression <- lm(cellLineData$percentControlGrowth ~ as.numeric(TrainingPopulation[GeneIndex,c(2:5,10:13)]), data = TrainingPopulation)
   linearRegressionSummary <- summary(linearRegression)
   linearRegressionfStat <- linearRegressionSummary$fstatistic
