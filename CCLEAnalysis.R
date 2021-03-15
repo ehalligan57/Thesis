@@ -7,17 +7,17 @@ library(ggplot2)
 
 ########## Load Data ##########
 
-RNAseqcounts <- fread("/Users/caitlinhalligan/CCLE_RNAseq_genes_counts_20180929.gct") 
+RNAseqcounts <- fread("/Users/caitlinhalligan/Desktop/Thesis/CCLE_RNAseq_genes_counts_20180929.gct") 
 RNAseqcountsGlioma <- select(RNAseqcounts,Name, Description,contains("CENTRAL_NERVOUS_SYSTEM"))
-Methylation <- fread("/Users/caitlinhalligan/CCLE_RRBS_TSS1kb_20181022.txt") 
+Methylation <- fread("/Users/caitlinhalligan/Desktop/Thesis/CCLE_RRBS_TSS1kb_20181022.txt") 
 # Contains experiment_id (convert to cell line name) and master_cpd_id (convert to drug name)#
-Sensitivity <- fread("/Users/caitlinhalligan/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.data.curves_post_qc.txt") 
+Sensitivity <- fread("/Users/caitlinhalligan/Desktop/Thesis/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.data.curves_post_qc.txt") 
 # File has master_ccl_id and ccl_name #
-CellLineMeta <- fread("/Users/caitlinhalligan/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.meta.per_cell_line.txt") 
+CellLineMeta <- fread("/Users/caitlinhalligan/Desktop/Thesis/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.meta.per_cell_line.txt") 
 # File has master_cpd_id to cdp_name (the drug name) #
-CompoundMeta <- fread("/Users/caitlinhalligan/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.meta.per_compound.txt") 
+CompoundMeta <- fread("/Users/caitlinhalligan/Desktop/Thesis/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.meta.per_compound.txt") 
 # File has experiment_id and master_ccl_id #
-ExperimentMeta <- fread("/Users/caitlinhalligan/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.meta.per_experiment.txt") 
+ExperimentMeta <- fread("/Users/caitlinhalligan/Desktop/Thesis/CTRPv2.0_2015_ctd2_ExpandedDataset/v20.meta.per_experiment.txt") 
 
 ########## Filter for MGMT Data ##########
 MGMTexpression <- as.data.frame(t(RNAseqcounts[which(RNAseqcounts$Description=="MGMT"),])) 
@@ -397,7 +397,7 @@ contrast_dgListGliomaTMZMGMTlow <- makeContrasts(TMZMGMTlow=resistant-sensitive,
 lrt <- glmLRT(fit, contrast=contrast_dgListGliomaTMZMGMTlow)
 #contrast vs co_eff?
 edgeR_result <- topTags(lrt)
-save(topTags(lrt,n=15000)$table, file='/Users/caitlinhalligan/')
+save(topTags(lrt,n=15000)$table, file='/Users/caitlinhalligan/Desktop/Thesis')
 deGenes <- decideTestsDGE(lrt, p=0.001)
 deGenes <- rownames(lrt)[as.logical(deGenes)]
 plotSmear(lrt, de.tags=deGenes)
