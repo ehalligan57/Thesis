@@ -3,3 +3,7 @@ data/GeneNames2.txt
 data/GSE10313_series_matrix.txt
 data/HG-U133_Plus_2.na36.annot.csv
 AnalysisofFryetal.R
+CCLE_RRBS_TSS1kb_20181022.txt
+CCLE_RNAseq_genes_counts_20180929.gct
+v20.data.curves_post_qc.txt
+data/CTRPv2.0_2015_ctd2_ExpandedDataset
