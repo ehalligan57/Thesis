@@ -7,7 +7,9 @@ library(ggplot2)
 
 ########## Load Data ##########
 
+#Setting working directory for either of our computers. Uncomment the line for your computer
 setwd("/Users/sdalin/Dropbox (Partners HealthCare)/Postdoc/Projects/CCNU/Caitlin/Thesis")
+#setwd("/Users/caitlinhalligan/Desktop/Thesis")
 
 RNAseqcounts <- fread("./data/CCLE_RNAseq_genes_counts_20180929.gct") 
 RNAseqcountsGlioma <- select(RNAseqcounts,Name, Description,contains("CENTRAL_NERVOUS_SYSTEM"))
@@ -164,6 +166,7 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
   for(RowNumber in (1:nrow(EdgeRdataframe))){ #loops of cell lines
     if (EdgeRdataframe$MGMTexpressiondata[RowNumber]=='high'){
       if (is.na(EdgeRdataframe[RowNumber,ColNumber])){ #skip NAs
+        next #This is the "official" command to skip to the next iteration of a for or while loop. It does work without it too.
       }else{
         new_sensitivity <- EdgeRdataframe[RowNumber,ColNumber]
         MGMThighSensitivity <- c(MGMThighSensitivity, new_sensitivity)
@@ -178,15 +181,48 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
   }
   new_designMatMGMThigh <- model.matrix(~0+MGMThighSensitivity) #this works, same as old one
   new_designMatMGMTlow <- model.matrix(~0+MGMTlowSensitivity) #this works, same as old one
-  ListofDesignMatricesMGMThigh[[ColNumber]] <- new_designMatMGMThigh
-  ListofDesignMatricesMGMTlow[[ColNumber]] <- new_designMatMGMTlow
+  
+  #saying "ListofDesignMatricesMGMThigh[[ColNumber]]" was storing each
+  #design matrix into the nth + 2 slot, since the first colNumber
+  #you use was col #3! I changed it so they start at 1 now.
+  nextEmptySlot <- length(ListofDesignMatricesMGMThigh) + 1
+  
+  ListofDesignMatricesMGMThigh[[nextEmptySlot]] <- new_designMatMGMThigh
+  ListofDesignMatricesMGMTlow[[nextEmptySlot]] <- new_designMatMGMTlow
 } 
+
+#Name the slots of the lists of design matrices by the drug they refer to
+names(ListofDesignMatricesMGMThigh) <- as.vector(sapply(names(EdgeRdataframe)[3:ncol(EdgeRdataframe)], function(x){substr(x, 1, regexpr(" ", x)-1)}))
+names(ListofDesignMatricesMGMTlow) <- sapply(names(EdgeRdataframe)[3:ncol(EdgeRdataframe)], function(x){substr(x, 1, regexpr(" ", x)-1)})
+
+
+
 ListofDesignMatricesMGMThigh[[3]]==designMatChlorambucilMGMThigh 
 #it's the same for Chlorambucil, Dacarbazine, Temozolomide, Bendamustine, Platin, Cyclophosphamide, Oxaliplatin
 #it is wrong for Ifosfamide (5)
+
+#this is true for me:
+all(designMatIfosfamideMGMThigh == ListofDesignMatricesMGMThigh$ifosfamide)
+
 ListofDesignMatricesMGMTlow[[3]]==designMatChlorambucilMGMTlow
 #it's right for Dacarbazine, Temozolomide, Bendamustine, Platin, Cyclophosphamide, Oxaliplatin
 #it's wrong for Chlorambucil (3), Ifosfamide (5)
+
+#this is true for me:
+all(designMatChlorambucilMGMTlow == ListofDesignMatricesMGMTlow$chlorambucil)
+
+#This gives me an error:
+all(designMatIfosfamideMGMTlow == ListofDesignMatricesMGMTlow$ifosfamide)
+
+#They are different sizes:
+dim(designMatIfosfamideMGMTlow)
+dim(ListofDesignMatricesMGMTlow$ifosfamide)
+
+#There are 14 MGMT low cell lines with ifosphamide sensitivity data
+sum(!is.na(EdgeRdataframe$`ifosfamide SensitivityAUC`)[EdgeRdataframe$MGMTexpressiondata == 'low'])
+
+#So the new version with the for loop is correct. Why was the old version incorrect though?
+#There's a typo on line 290 where you set that design matrix referring to MGMT high, not low.
 
 
 # Design Matrix for MGMT high, chlorambucil # #28 total, 14 R, 14S #error message but it looks right?
@@ -251,7 +287,7 @@ IfosfamideMGMTlow <- EdgeRdataframe %>%
   dplyr::filter(MGMTexpressiondata=='low') %>%
   select(celllines,`ifosfamide SensitivityAUC`) %>%
   na.omit(`ifosfamide SensitivityAUC`)
-designMatIfosfamideMGMTlow <- model.matrix(~0+IfosfamideMGMThigh$`ifosfamide SensitivityAUC`)
+designMatIfosfamideMGMTlow <- model.matrix(~0+IfosfamideMGMThigh$`ifosfamide SensitivityAUC`) #typo here: referring to Ifosfamide high, not low.
 
 # Design Matrix for MGMT high, temozolomide # #28 total, 17 R, 11 S
 #TemozolomideMGMThigh <- EdgeRdataframe %>% filter(EdgeRdataframe$MGMTexpression=='high')
