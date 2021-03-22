@@ -208,7 +208,13 @@ ListofAllDesignMatrices <- c(ListofDesignMatricesMGMThigh,ListofDesignMatricesMG
 ListofAllCellLines <- c(CellLinesMGMTHigh,CellLinesMGMTLow)
 for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
   #trying to only select cell lines from RNAseqcountsGlioma that are used for each group 
-  dgListGlioma<- DGEList(counts=RNAseqcountsGlioma %>% select(colnames(RNAseqcountsGlioma)[3:67]==ListofAllCellLines[DesignMatrixIndex]), genes=RNAseqcountsGlioma[,1:2])
+  dgListGlioma<- DGEList(counts=RNAseqcountsGlioma %>% 
+                           select(colnames(RNAseqcountsGlioma)[3:67]==ListofAllCellLines[DesignMatrixIndex]), 
+                         genes=RNAseqcountsGlioma[,1:2])
+  #SD comment: This looks generally good. You may want to not hard-code the 67 on line 212 - what if one time you have
+  #more cell lines than that? It would cause a problem, but there's a way to fix it.
+  #Also, you may want to have your dgListGlioma to actually be a list of dgLists, one for each condition you're testing
+  #That way, you'll save all the data rather than losing it each time the loop re-sets. Definitely a good start so far!
   countsPerMillion <- cpm(dgListGlioma) 
 }
 
