@@ -160,10 +160,13 @@ print(TMZSensitivityplot +
 #for each drug(col) if MGMT in that row is high create designmat separating res and sen and if MGMT is low create designmat separating res and sen
 ListofDesignMatricesMGMThigh <- c()
 ListofDesignMatricesMGMTlow <- c()
+CellLinesMGMTHigh <- c() #Need to initialize these guys
+CellLinesMGMTLow <- c() #Need to initialize these guys
 for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
   MGMThighSensitivity <- c()
   MGMTlowSensitivity <- c()
-  CellLineNames <- c()
+  CellLineNamesMGMThigh <- c() #Need to initialize with the same name as you use in the loop
+  CellLineNamesMGMTlow <- c() #Need one for MGMTlow as well
   for(RowNumber in (1:nrow(EdgeRdataframe))){ #loops of cell lines
     if (EdgeRdataframe$MGMTexpressiondata[RowNumber]=='high'){
       if (is.na(EdgeRdataframe[RowNumber,ColNumber])){ #skip NAs
@@ -172,7 +175,7 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
         new_sensitivity <- EdgeRdataframe[RowNumber,ColNumber]
         MGMThighSensitivity <- c(MGMThighSensitivity, new_sensitivity)
         new_cellline <- EdgeRdataframe[RowNumber,1] #each run of the for loop it stores the cell line name
-        CellLineNamesMGMThigh <- c(CellLineNames, new_cellline) #all cell line names in vector for MGMT high
+        CellLineNamesMGMThigh <- c(CellLineNamesMGMThigh, new_cellline) #all cell line names in vector for MGMT high
       }
     }else{ #MGMT low
       if (is.na(EdgeRdataframe[RowNumber,ColNumber])){ #skip NAs
@@ -180,7 +183,7 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
         new_sensitivity <- EdgeRdataframe[RowNumber,ColNumber]
         MGMTlowSensitivity <- c(MGMTlowSensitivity, new_sensitivity)
         new_cellline <- EdgeRdataframe[RowNumber,1] #each run of the for loop it stores the cell line name
-        CellLineNamesMGMTlow <- c(CellLineNames, new_cellline) #all cell line names in vector for MGMT low
+        CellLineNamesMGMTlow <- c(CellLineNamesMGMTlow, new_cellline) #all cell line names in vector for MGMT low
       }
     }
   }
