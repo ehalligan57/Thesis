@@ -8,8 +8,8 @@ library(ggplot2)
 ########## Load Data ##########
 
 #Setting working directory for either of our computers. Uncomment the line for your computer
-setwd("/Users/sdalin/Dropbox (Partners HealthCare)/Postdoc/Projects/CCNU/Caitlin/Thesis")
-#setwd("/Users/caitlinhalligan/Desktop/Thesis")
+#setwd("/Users/sdalin/Dropbox (Partners HealthCare)/Postdoc/Projects/CCNU/Caitlin/Thesis")
+setwd("/Users/caitlinhalligan/Desktop/Thesis")
 
 RNAseqcounts <- fread("./data/CCLE_RNAseq_genes_counts_20180929.gct") 
 RNAseqcountsGlioma <- select(RNAseqcounts,Name, Description,contains("CENTRAL_NERVOUS_SYSTEM"))
@@ -158,6 +158,7 @@ print(TMZSensitivityplot +
 #########     Making the Design Matrix    ######### 
 #make new dataframe with just MGMT high cell lines and just MGMT low cell lines
 #for each drug(col) if MGMT in that row is high create designmat separating res and sen and if MGMT is low create designmat separating res and sen
+rownames(EdgeRdataframe) <- EdgeRdataframe[,1] 
 ListofDesignMatricesMGMThigh <- c()
 ListofDesignMatricesMGMTlow <- c()
 CellLinesMGMTHigh <- c() #Need to initialize these guys
@@ -176,6 +177,7 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
         MGMThighSensitivity <- c(MGMThighSensitivity, new_sensitivity)
         new_cellline <- EdgeRdataframe[RowNumber,1] #each run of the for loop it stores the cell line name
         CellLineNamesMGMThigh <- c(CellLineNamesMGMThigh, new_cellline) #all cell line names in vector for MGMT high
+        #CellLineNamesMGMThigh does not store cell lines correctly? I'm not sure why
       }
     }else{ #MGMT low
       if (is.na(EdgeRdataframe[RowNumber,ColNumber])){ #skip NAs
@@ -206,17 +208,47 @@ names(ListofDesignMatricesMGMTlow) <- sapply(names(EdgeRdataframe)[3:ncol(EdgeRd
 #########     EdgeR Workflow    ######### 
 ListofAllDesignMatrices <- c(ListofDesignMatricesMGMThigh,ListofDesignMatricesMGMTlow)
 ListofAllCellLines <- c(CellLinesMGMTHigh,CellLinesMGMTLow)
+dgListGliomaList <- c()
+All_DEG <- c()
 for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
-  #trying to only select cell lines from RNAseqcountsGlioma that are used for each group 
+  #Creating a dgList
   dgListGlioma<- DGEList(counts=RNAseqcountsGlioma %>% 
-                           select(colnames(RNAseqcountsGlioma)[3:67]==ListofAllCellLines[DesignMatrixIndex]), 
-                         genes=RNAseqcountsGlioma[,1:2])
-  #SD comment: This looks generally good. You may want to not hard-code the 67 on line 212 - what if one time you have
-  #more cell lines than that? It would cause a problem, but there's a way to fix it.
-  #Also, you may want to have your dgListGlioma to actually be a list of dgLists, one for each condition you're testing
-  #That way, you'll save all the data rather than losing it each time the loop re-sets. Definitely a good start so far!
+                           select(colnames(RNAseqcountsGlioma[,-c(1,2)])==ListofAllCellLines[DesignMatrixIndex]), 
+                         genes=RNAseqcountsGlioma[,1:2]) 
+  #still not sure how to get cell line name instead of row name
+  dgListGliomaList <- c(dgListGliomaList, dgListGlioma) #list of dgLists
   countsPerMillion <- cpm(dgListGlioma) 
+  #Filtering
+  countCheck <- countsPerMillion > 1 #which genes have more than 1 cpm
+  keep <- which(rowSums(countCheck) >= 2) #rowSums adds TRUEs for each gene, #genes to keep
+  dgListGlioma <- dgListGlioma[keep,]
+  #Normalization
+  dgListGlioma <- calcNormFactors(dgListGlioma, method="TMM")
+  # Data Exploration
+  new_plot <- plotMDS(dgListGlioma)
+  MDSplots <- c(MDSplots, new_plot)
+  # Estimating Dispersons
+  dgListGlioma <- estimateDisp(dgListGlioma, design=ListofAllDesignMatrices[DesignMatrixIndex])
+  plotBCV(dgListGlioma) 
+  # Differential Expression
+  fit <- glmFit(dgListGliomaTMZMGMTlow, designMatTemozolomideMGMTlow)
+  contrast_dgListGliomaTMZMGMTlow <- makeContrasts(TMZMGMTlow=resistant-sensitive,
+                                                   levels=designMatTemozolomideMGMTlow)
+  lrt <- glmLRT(fit, contrast=contrast_dgListGliomaTMZMGMTlow)
+  edgeR_result <- topTags(lrt)
+  new_DEG <- edgeR_result$table
+  All_DEG <- c(All_DEG,edgeR_result$table)
+  deGenes <- decideTestsDGE(lrt, p=0.001)
+  deGenes <- rownames(lrt)[as.logical(deGenes)]
+  plotSmear(lrt, de.tags=deGenes)
+  abline(h=c(-1, 1), col=2)
 }
+#saves list of dgLists, MDS plots, BVC plots, 
+
+#SD comment: This looks generally good. You may want to not hard-code the 67 on line 212 - what if one time you have
+#more cell lines than that? It would cause a problem, but there's a way to fix it.
+#Also, you may want to have your dgListGlioma to actually be a list of dgLists, one for each condition you're testing
+#That way, you'll save all the data rather than losing it each time the loop re-sets. Definitely a good start so far!
 
 #Past work
 # Creating a DGEList object
