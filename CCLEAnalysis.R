@@ -209,12 +209,12 @@ names(ListofDesignMatricesMGMTlow) <- sapply(names(EdgeRdataframe)[3:ncol(EdgeRd
 ListofAllDesignMatrices <- c(ListofDesignMatricesMGMThigh,ListofDesignMatricesMGMTlow)
 ListofAllCellLines <- c(CellLinesMGMTHigh,CellLinesMGMTLow)
 dgListGliomaList <- c()
-MDSplots <- c()
-All_DEG <- data.frame(matrix(ncol = 1, nrow = 50)) #how big to make this to fit all the genes?
+#MDSplots <- c()
+All_DEG <- c()
 for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
   dgListGlioma<- DGEList(counts=select(RNAseqcountsGlioma, unlist(ListofAllCellLines[DesignMatrixIndex])), 
-                                       genes=RNAseqcountsGlioma[,1:2]) 
-  dgListGliomaList <- c(dgListGliomaList, dgListGlioma) #list of dgLists
+                                       genes=RNAseqcountsGlioma[,2]) 
+  dgListGliomaList <- c(dgListGliomaList, dgListGlioma) 
   countsPerMillion <- cpm(dgListGlioma)
   #Filtering + Normalization 
   countCheck <- countsPerMillion > 1 
@@ -223,19 +223,18 @@ for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
   dgListGlioma <- calcNormFactors(dgListGlioma, method="TMM")
   #new_plot <- plotMDS(dgListGlioma)
   #MDSplots <- c(MDSplots, new_plot) #how do I save these plots correctly ? as different names ?
-  # Estimating Dispersons- ERROR
-  dgListGlioma <- estimateDisp(dgListGlioma, design=ListofAllDesignMatrices[DesignMatrixIndex])
+  # Estimating Dispersons
+  dgListGlioma <- estimateDisp(dgListGlioma, design=ListofAllDesignMatrices[[DesignMatrixIndex]])
   #plotBCV(dgListGlioma) 
   # Differential Expression
-  fit <- glmFit(dgListGlioma, ListofAllDesignMatrices[DesignMatrixIndex])  #this line is not working
-  contrast_dgListGlioma <- makeContrasts(Sensitivity=resistant-sensitive,
-                                         levels=ListofAllDesignMatrices[DesignMatrixIndex])
-  lrt <- glmLRT(fit, contrast=contrast_dgListGlioma)
-  edgeR_result <- topTags(lrt)
-  deGenes <- decideTestsDGE(lrt, p=0.001)
-  deGenes <- rownames(lrt)[as.logical(deGenes)]
-  All_DEG[,ncol(data)+1] <- deGenes #adds a new column which contains deGenes
-  colnames(All_DEG)[ncol(All_DEG)] <- names(ListofAllDesignMatrices[DesignMatrixIndex]) #names the columns by drug
+  fit <- glmFit(dgListGlioma, ListofAllDesignMatrices[[DesignMatrixIndex]]) 
+  lrt <- glmLRT(fit, contrast=c(1,-1))
+  edgeR_result <- topTags(lrt, n=Inf, p.value=.001)
+  #deGenes <- decideTestsDGE(lrt, p=0.001)
+  #deGenes <- rownames(lrt)[as.logical(deGenes)]
+  All_DEG <- c(All_DEG,list(edgeR_result$table))
+  #All_DEG[length(edgeR_result[["table"]][["Description"]]),ncol(All_DEG)+1] <- edgeR_result[["table"]][["Description"]] #adds a new column which contains DEG
+  #colnames(All_DEG)[ncol(All_DEG)] <- names(ListofAllDesignMatrices[DesignMatrixIndex]) #names the columns by drug
   #plotSmear(lrt, de.tags=deGenes)
   #abline(h=c(-1, 1), col=2)
 }
