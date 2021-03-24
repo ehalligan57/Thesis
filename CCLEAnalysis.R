@@ -175,7 +175,7 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
       }else{
         new_sensitivity <- EdgeRdataframe[RowNumber,ColNumber]
         MGMThighSensitivity <- c(MGMThighSensitivity, new_sensitivity)
-        new_cellline <- EdgeRdataframe[RowNumber,1] #each run of the for loop it stores the cell line name
+        new_cellline <- as.character(EdgeRdataframe[RowNumber,1]) #each run of the for loop it stores the cell line name
         CellLineNamesMGMThigh <- c(CellLineNamesMGMThigh, new_cellline) #all cell line names in vector for MGMT high
         #CellLineNamesMGMThigh does not store cell lines correctly? I'm not sure why
       }
@@ -184,7 +184,7 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
       }else{
         new_sensitivity <- EdgeRdataframe[RowNumber,ColNumber]
         MGMTlowSensitivity <- c(MGMTlowSensitivity, new_sensitivity)
-        new_cellline <- EdgeRdataframe[RowNumber,1] #each run of the for loop it stores the cell line name
+        new_cellline <- as.character(EdgeRdataframe[RowNumber,1]) #each run of the for loop it stores the cell line name
         CellLineNamesMGMTlow <- c(CellLineNamesMGMTlow, new_cellline) #all cell line names in vector for MGMT low
       }
     }
@@ -209,41 +209,37 @@ names(ListofDesignMatricesMGMTlow) <- sapply(names(EdgeRdataframe)[3:ncol(EdgeRd
 ListofAllDesignMatrices <- c(ListofDesignMatricesMGMThigh,ListofDesignMatricesMGMTlow)
 ListofAllCellLines <- c(CellLinesMGMTHigh,CellLinesMGMTLow)
 dgListGliomaList <- c()
-All_DEG <- c()
+MDSplots <- c()
+All_DEG <- data.frame(matrix(ncol = 1, nrow = 50)) #how big to make this to fit all the genes?
 for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
-  #Creating a dgList
-  dgListGlioma<- DGEList(counts=RNAseqcountsGlioma %>% 
-                           select(colnames(RNAseqcountsGlioma[,-c(1,2)])==ListofAllCellLines[DesignMatrixIndex]), 
-                         genes=RNAseqcountsGlioma[,1:2]) 
-  #still not sure how to get cell line name instead of row name
+  dgListGlioma<- DGEList(counts=select(RNAseqcountsGlioma, unlist(ListofAllCellLines[DesignMatrixIndex])), 
+                                       genes=RNAseqcountsGlioma[,1:2]) 
   dgListGliomaList <- c(dgListGliomaList, dgListGlioma) #list of dgLists
-  countsPerMillion <- cpm(dgListGlioma) 
-  #Filtering
-  countCheck <- countsPerMillion > 1 #which genes have more than 1 cpm
-  keep <- which(rowSums(countCheck) >= 2) #rowSums adds TRUEs for each gene, #genes to keep
+  countsPerMillion <- cpm(dgListGlioma)
+  #Filtering + Normalization 
+  countCheck <- countsPerMillion > 1 
+  keep <- which(rowSums(countCheck) >= 2) 
   dgListGlioma <- dgListGlioma[keep,]
-  #Normalization
   dgListGlioma <- calcNormFactors(dgListGlioma, method="TMM")
-  # Data Exploration
-  new_plot <- plotMDS(dgListGlioma)
-  MDSplots <- c(MDSplots, new_plot)
-  # Estimating Dispersons
+  #new_plot <- plotMDS(dgListGlioma)
+  #MDSplots <- c(MDSplots, new_plot) #how do I save these plots correctly ? as different names ?
+  # Estimating Dispersons- ERROR
   dgListGlioma <- estimateDisp(dgListGlioma, design=ListofAllDesignMatrices[DesignMatrixIndex])
-  plotBCV(dgListGlioma) 
+  #plotBCV(dgListGlioma) 
   # Differential Expression
-  fit <- glmFit(dgListGliomaTMZMGMTlow, designMatTemozolomideMGMTlow)
-  contrast_dgListGliomaTMZMGMTlow <- makeContrasts(TMZMGMTlow=resistant-sensitive,
-                                                   levels=designMatTemozolomideMGMTlow)
-  lrt <- glmLRT(fit, contrast=contrast_dgListGliomaTMZMGMTlow)
+  fit <- glmFit(dgListGlioma, ListofAllDesignMatrices[DesignMatrixIndex])  #this line is not working
+  contrast_dgListGlioma <- makeContrasts(Sensitivity=resistant-sensitive,
+                                         levels=ListofAllDesignMatrices[DesignMatrixIndex])
+  lrt <- glmLRT(fit, contrast=contrast_dgListGlioma)
   edgeR_result <- topTags(lrt)
-  new_DEG <- edgeR_result$table
-  All_DEG <- c(All_DEG,edgeR_result$table)
   deGenes <- decideTestsDGE(lrt, p=0.001)
   deGenes <- rownames(lrt)[as.logical(deGenes)]
-  plotSmear(lrt, de.tags=deGenes)
-  abline(h=c(-1, 1), col=2)
+  All_DEG[,ncol(data)+1] <- deGenes #adds a new column which contains deGenes
+  colnames(All_DEG)[ncol(All_DEG)] <- names(ListofAllDesignMatrices[DesignMatrixIndex]) #names the columns by drug
+  #plotSmear(lrt, de.tags=deGenes)
+  #abline(h=c(-1, 1), col=2)
 }
-#saves list of dgLists, MDS plots, BVC plots, 
+
 
 #SD comment: This looks generally good. You may want to not hard-code the 67 on line 212 - what if one time you have
 #more cell lines than that? It would cause a problem, but there's a way to fix it.
