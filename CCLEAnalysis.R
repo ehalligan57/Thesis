@@ -4,6 +4,7 @@
 library(data.table)
 library(tidyverse)
 library(ggplot2)
+library(ggfortify)
 
 ########## Load Data ##########
 
@@ -44,15 +45,11 @@ for(ExperimentID in unique(Sensitivity$experiment_id)){ #loops over each row
 ########## Filter out just alkylators ##########
 DrugNametoID <-filter(CompoundMeta,grepl("DNA alkylator",target_or_activity_of_compound)) #cpd_name to master_cpd_id
 AlkylatorSensitivity<-filter(Sensitivity, master_cpd_id %in% DrugNametoID$master_cpd_id) 
-TMZSensitivity <- filter(Sensitivity, master_cpd_id=="351043") 
-#check if it worked:
-DrugNametoID$master_cpd_id
-unique(AlkylatorSensitivity$master_cpd_id) # these two are the same
 
 plot(Sensitivity$conc_pts_fit,Sensitivity$area_under_curve) 
 #there is not a trend in AUC and points fit, so there may be a normalization going on that we don't know about
 
-########## Create Data Frame with MGMT methylation, MGMT expression, TMZ sensitivity for all cell lines ##########
+########## Create Data Frame with MGMT methylation, MGMT expression, drug sensitivity for all cell lines ##########
 EdgeRdataframe <- data.frame(celllines=colnames(RNAseqcounts)[-(1:2)]) #create table with first column as cell line names
 EdgeRdataframe$MGMTexpressiondata <- NA 
 for(RowNumber in (1:nrow(EdgeRdataframe))){ #loops over cell line names
@@ -60,6 +57,7 @@ for(RowNumber in (1:nrow(EdgeRdataframe))){ #loops over cell line names
   CellLineNumber <- unlist(strsplit(as.character(CellLineName),"_"))[1]
   EdgeRdataframe$MGMTexpressiondata[RowNumber] <- MGMTexpression$V1[CellLineName==row.names(MGMTexpression)]  
 }
+
 #for cell lines which have multiple TMZ sensitivity trials, the cell lines could have used different media. A possible
 # improvement is using the media which is most commonly used for those cell lines
 
@@ -83,8 +81,6 @@ for (AlkylatorcpdID in unique(AlkylatorSensitivity$master_cpd_id)){ #for each Al
 ########## Filter table for just glioma cell lines ##########
 count(grep("CENTRAL_NERVOUS_SYSTEM",EdgeRdataframe$celllines,fixed=TRUE)) #65 glioma cell lines
 EdgeRdataframe <- EdgeRdataframe[grep("CENTRAL_NERVOUS_SYSTEM",EdgeRdataframe$celllines,fixed=TRUE),]
-# how many useable cell lines for EdgeR? 
-65 - sum(is.na(EdgeRdataframe$`temozolomide SensitivityAUC`)) #45
 
 ########## Label cell lines as high or low MGMT ##########
 ggplot(data = EdgeRdataframe, aes(x = EdgeRdataframe$MGMTexpressiondata)) + geom_histogram() + geom_histogram(binwidth=10)
@@ -115,15 +111,15 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){
 
 ########     Plots describing the cell lines     #########
 # MGMT expression and methylation
-ggplot(data = EdgeRdataframe, aes(x = MGMTmethylationdata, y = MGMTexpressiondata)) + geom_point()
+ggplot(data = EdgeRdataframe, aes(x = MGMTmethylation, y = MGMTexpression)) + geom_point()
 #why is it not linear? #use gene expression and not methylation 
 
 # MGMT methylation or expression vs TMZ
-ggplot(data = EdgeRdataframe, aes(x = MGMTmethylationdata, y = `temozolomide SensitivityAUC`)) + geom_point()
-ggplot(data = EdgeRdataframe, aes(x = MGMTexpressiondata, y = `temozolomide SensitivityAUC`)) + geom_point()
+ggplot(data = EdgeRdataframe, aes(x = MGMTmethylation, y = `temozolomide SensitivityAUC`)) + geom_point()
+ggplot(data = EdgeRdataframe, aes(x = MGMTmethylation, y = `temozolomide SensitivityAUC`)) + geom_point()
 
 #MGMT methylation of cell lines
-ggplot(data = EdgeRdataframe, aes(x = MGMTmethylationdata)) + geom_histogram() + geom_histogram(binwidth=10)
+ggplot(data = EdgeRdataframe, aes(x = MGMTmethylation)) + geom_histogram() + geom_histogram(binwidth=10)
 #many have low MGMT methylation
 #Graph theme
 theme<-theme(panel.background = element_blank(),
@@ -143,7 +139,7 @@ theme<-theme(panel.background = element_blank(),
              legend.background = element_rect(fill=alpha('blue', 0)),
              legend.text = element_text(size=14))
 
-MGMTExpressionplot <- ggplot(data = EdgeRdataframe, aes(x = MGMTexpressiondata)) + geom_histogram() + geom_histogram(binwidth=1) + theme
+MGMTExpressionplot <- ggplot(data = EdgeRdataframe, aes(x = MGMTexpression)) + geom_histogram() + geom_histogram(binwidth=1) + theme
 print(MGMTExpressionplot + 
         ggtitle("Distribution of MGMT Expression Across Glioma Cell Lines")+
         labs(y="Number of Cell Lines", x = "MGMT Expression (counts)"))
@@ -158,7 +154,6 @@ print(TMZSensitivityplot +
 #########     Making the Design Matrix    ######### 
 #make new dataframe with just MGMT high cell lines and just MGMT low cell lines
 #for each drug(col) if MGMT in that row is high create designmat separating res and sen and if MGMT is low create designmat separating res and sen
-rownames(EdgeRdataframe) <- EdgeRdataframe[,1] 
 ListofDesignMatricesMGMThigh <- c()
 ListofDesignMatricesMGMTlow <- c()
 CellLinesMGMTHigh <- c() #Need to initialize these guys
@@ -221,64 +216,42 @@ for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
   keep <- which(rowSums(countCheck) >= 2) 
   dgListGlioma <- dgListGlioma[keep,]
   dgListGlioma <- calcNormFactors(dgListGlioma, method="TMM")
-  #new_plot <- plotMDS(dgListGlioma)
-  #MDSplots <- c(MDSplots, new_plot) #how do I save these plots correctly ? as different names ?
+  # Plot 1: MDS
+  MDSplots <- plotMDS(dgListGlioma)
   # Estimating Dispersons
   dgListGlioma <- estimateDisp(dgListGlioma, design=ListofAllDesignMatrices[[DesignMatrixIndex]])
-  #plotBCV(dgListGlioma) 
+  # Plot 2: BCV
+  plotBCV(dgListGlioma) 
   # Differential Expression
   fit <- glmFit(dgListGlioma, ListofAllDesignMatrices[[DesignMatrixIndex]]) 
   lrt <- glmLRT(fit, contrast=c(1,-1))
   edgeR_result <- topTags(lrt, n=Inf, p.value=.001)
-  #deGenes <- decideTestsDGE(lrt, p=0.001)
-  #deGenes <- rownames(lrt)[as.logical(deGenes)]
   All_DEG <- c(All_DEG,list(edgeR_result$table))
-  #All_DEG[length(edgeR_result[["table"]][["Description"]]),ncol(All_DEG)+1] <- edgeR_result[["table"]][["Description"]] #adds a new column which contains DEG
-  #colnames(All_DEG)[ncol(All_DEG)] <- names(ListofAllDesignMatrices[DesignMatrixIndex]) #names the columns by drug
-  #plotSmear(lrt, de.tags=deGenes)
-  #abline(h=c(-1, 1), col=2)
+  plotSmear(lrt, de.tags=deGenes, xlab="Average log CPM", ylab="log-fold-change")
+  abline(h=c(-1, 1), col=2)
+  # Plot 3: Volcano
+  lrt$table$diffexpressed <- "NO"
+  lrt$table$diffexpressed[lrt$table$logFC > 8 & lrt$table$PValue < 0.001] <- "UP"
+  lrt$table$diffexpressed[lrt$table$logFC < -8 & lrt$table$PValue < 0.001] <- "DOWN"
+  mycolors <- c("blue", "red", "black")
+  names(mycolors) <- c("DOWN", "UP", "NO")
+  lrt$table$delabel <- NA
+  lrt$table$delabel[lrt$table$diffexpressed != "NO"] <- lrt$genes$Description[lrt$table$diffexpressed != "NO"]
+  ggplot(data=lrt$table, mapping = aes(x=logFC, y=-log10(PValue), col=diffexpressed)) + 
+    geom_point() + 
+    theme_minimal() +
+    geom_text(label=lrt$table$delabel) +
+    geom_hline(yintercept=-log10(0.001), col="red") +
+    geom_vline(xintercept=c(-8, 8), col="red") +
+    scale_colour_manual(values = mycolors)
+  # Plot 4: PCA
+  Flipped<-as.data.frame(t(dgListGlioma[["counts"]]))
+  #Flipped$sensitivity <-NA
+  #Flipped$sensitivity <- #Flipped$sensitivity[dgListGlioma[["design"]]$MGMTlowSensitivityresistant==1]  #somehow determine sensitive vs resistant and label
+  #anything T is resistant, color different than S
+  autoplot(prcomp(Flipped, scale. = TRUE), label = TRUE)
 }
 
 
-#SD comment: This looks generally good. You may want to not hard-code the 67 on line 212 - what if one time you have
-#more cell lines than that? It would cause a problem, but there's a way to fix it.
-#Also, you may want to have your dgListGlioma to actually be a list of dgLists, one for each condition you're testing
-#That way, you'll save all the data rather than losing it each time the loop re-sets. Definitely a good start so far!
 
-#Past work
-# Creating a DGEList object
-dgListGliomaTMZMGMTlow <- DGEList(counts=RNAseqcountsGlioma %>% select(TemozolomideMGMTlow$celllines), genes=RNAseqcountsGlioma[,1:2])
-countsPerMillion <- cpm(dgListGliomaTMZMGMTlow) 
-# Filtering
-#cpm is number of reads mapped to a gene/total number of mapped reads from th library
-countCheck <- countsPerMillion > 1 #which genes have more than 1 cpm
-keep <- which(rowSums(countCheck) >= 2) #rowSums adds TRUEs for each gene, #genes to keep
-dgListGliomaTMZMGMTlow <- dgListGliomaTMZMGMTlow[keep,]
-# Normalization
-#TMM normalization adjusts library sizes based on the assumption that most genes are not differentially expressed
-dgListGliomaTMZMGMTlow <- calcNormFactors(dgListGliomaTMZMGMTlow, method="TMM") #Trimmed mean of M-values normalization
-# Data Exploration
-plotMDS(dgListGlioma) #what does this show again?
-# Setting up the model- try TMZ/MGMT low first
-designMatTemozolomideMGMTlow
-# Estimating Dispersons
-dgListGliomaTMZMGMTlow <- estimateGLMCommonDisp(dgListGliomaTMZMGMTlow, design=designMatTemozolomideMGMTlow)
-#dispersion is same for each gene
-dgListGliomaTMZMGMTlow <- estimateGLMTrendedDisp(dgListGliomaTMZMGMTlow, design=designMatTemozolomideMGMTlow)
-#trend between expression and variation
-dgListGliomaTMZMGMTlow <- estimateGLMTagwiseDisp(dgListGliomaTMZMGMTlow, design=designMatTemozolomideMGMTlow)
-#each gene has its own dispersion
-plotBCV(dgListGliomaTMZMGMTlow) 
-# Differential Expression
-fit <- glmFit(dgListGliomaTMZMGMTlow, designMatTemozolomideMGMTlow)
-contrast_dgListGliomaTMZMGMTlow <- makeContrasts(TMZMGMTlow=resistant-sensitive,
-                                                 levels=designMatTemozolomideMGMTlow)
-lrt <- glmLRT(fit, contrast=contrast_dgListGliomaTMZMGMTlow)
-edgeR_result <- topTags(lrt)
-save(topTags(lrt,n=15000)$table, file='/Users/caitlinhalligan/Desktop/Thesis')
-deGenes <- decideTestsDGE(lrt, p=0.001)
-deGenes <- rownames(lrt)[as.logical(deGenes)]
-plotSmear(lrt, de.tags=deGenes)
-     abline(h=c(-1, 1), col=2)
-#differentially expressed genes
-View(edgeR_result$table)
+
