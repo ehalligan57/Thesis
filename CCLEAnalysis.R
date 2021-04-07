@@ -5,6 +5,7 @@ library(data.table)
 library(tidyverse)
 library(ggplot2)
 library(ggfortify)
+library(ggrepel)
 
 ########## Load Data ##########
 
@@ -207,6 +208,11 @@ dgListGliomaList <- c()
 #MDSplots <- c()
 All_DEG <- c()
 for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
+  if (DesignMatrixIndex <= 8){ #skip NAs
+    MGMTstatus <- "MGMT high"
+  }else{
+    MGMTstatus <- "MGMT low"
+  }
   dgListGlioma<- DGEList(counts=select(RNAseqcountsGlioma, unlist(ListofAllCellLines[DesignMatrixIndex])), 
                                        genes=RNAseqcountsGlioma[,2]) 
   dgListGliomaList <- c(dgListGliomaList, dgListGlioma) 
@@ -217,41 +223,57 @@ for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
   dgListGlioma <- dgListGlioma[keep,]
   dgListGlioma <- calcNormFactors(dgListGlioma, method="TMM")
   # Plot 1: MDS
-  MDSplots <- plotMDS(dgListGlioma)
+  Colors<-select(as.data.frame(ListofAllDesignMatrices[[DesignMatrixIndex]]),1)
+  Colors[Colors=="1"]<-"green" #resistant
+  Colors[Colors=="0"]<-"red" #sensitive
+  png(filename=paste0(sprintf("MDS plot for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus),".png"))
+  MDSplots <- plotMDS(dgListGlioma,
+                      pch = 20,
+                      col=Colors[[1]],
+                      main=sprintf("MDS plot for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus))
+  dev.off()
   # Estimating Dispersons
   dgListGlioma <- estimateDisp(dgListGlioma, design=ListofAllDesignMatrices[[DesignMatrixIndex]])
   # Plot 2: BCV
-  plotBCV(dgListGlioma) 
+  png(filename=paste0(sprintf("Dispersions for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus),".png"))
+  plotBCV(dgListGlioma,
+          main=sprintf("Dispersions for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus))
+  dev.off()
   # Differential Expression
   fit <- glmFit(dgListGlioma, ListofAllDesignMatrices[[DesignMatrixIndex]]) 
   lrt <- glmLRT(fit, contrast=c(1,-1))
   edgeR_result <- topTags(lrt, n=Inf, p.value=.001)
   All_DEG <- c(All_DEG,list(edgeR_result$table))
-  plotSmear(lrt, de.tags=deGenes, xlab="Average log CPM", ylab="log-fold-change")
-  abline(h=c(-1, 1), col=2)
+  #plotSmear(lrt, de.tags=deGenes, xlab="Average log CPM", ylab="log-fold-change")
+  #abline(h=c(-1, 1), col=2)
   # Plot 3: Volcano
   lrt$table$diffexpressed <- "NO"
-  lrt$table$diffexpressed[lrt$table$logFC > 8 & lrt$table$PValue < 0.001] <- "UP"
-  lrt$table$diffexpressed[lrt$table$logFC < -8 & lrt$table$PValue < 0.001] <- "DOWN"
+  lrt$table$FDR <- NA
+  lrt$table$FDR <- p.adjust(lrt$table$PValue,method="BH")
+  lrt$table$diffexpressed[lrt$table$logFC > 1 & lrt$table$FDR < 0.001] <- "UP"
+  lrt$table$diffexpressed[lrt$table$logFC < -1 & lrt$table$FDR < 0.001] <- "DOWN"
   mycolors <- c("blue", "red", "black")
   names(mycolors) <- c("DOWN", "UP", "NO")
   lrt$table$delabel <- NA
   lrt$table$delabel[lrt$table$diffexpressed != "NO"] <- lrt$genes$Description[lrt$table$diffexpressed != "NO"]
-  ggplot(data=lrt$table, mapping = aes(x=logFC, y=-log10(PValue), col=diffexpressed)) + 
-    geom_point() + 
+  LastGene <- length(which(lrt$table$diffexpressed=="DOWN"))+length(which(lrt$table$diffexpressed=="UP"))
+  Pvalue <- ((lrt$table[order(lrt$table$FDR), ][LastGene,4])+(lrt$table[order(lrt$table$FDR), ][LastGene+1,4]))/2
+  volplot <- ggplot(data=lrt$table, mapping = aes(x=logFC, y=-log10(PValue), col=diffexpressed)) +
+    geom_point() +
     theme_minimal() +
-    geom_text(label=lrt$table$delabel) +
-    geom_hline(yintercept=-log10(0.001), col="red") +
-    geom_vline(xintercept=c(-8, 8), col="red") +
-    scale_colour_manual(values = mycolors)
-  # Plot 4: PCA
+    geom_text_repel(aes(label = lrt$table$delabel), size = 3,
+                    max.overlaps=Inf,
+                    show.legend  = F) +
+    geom_hline(yintercept=-log10(Pvalue), col="red") +
+    scale_colour_manual(values = mycolors) +
+    labs(title=sprintf("Differentially expressed genes for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus))
+  ggsave(paste0(sprintf("Differentially expressed genes for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus),".png"))
+  #Plot 4: PCA
   Flipped<-as.data.frame(t(dgListGlioma[["counts"]]))
-  #Flipped$sensitivity <-NA
-  #Flipped$sensitivity <- #Flipped$sensitivity[dgListGlioma[["design"]]$MGMTlowSensitivityresistant==1]  #somehow determine sensitive vs resistant and label
-  #anything T is resistant, color different than S
-  autoplot(prcomp(Flipped, scale. = TRUE), label = TRUE)
+  png(filename=paste0(sprintf("PCA plot for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus),".png"))
+  autoplot(prcomp(Flipped, scale. = TRUE),
+           labels= TRUE,
+           colour=Colors[[1]],
+           main=sprintf("PCA plot for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus))
+  dev.off()
 }
-
-
-
-
