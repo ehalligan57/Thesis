@@ -173,7 +173,6 @@ for(ColNumber in (3:ncol(EdgeRdataframe))){#loops over drugs
         MGMThighSensitivity <- c(MGMThighSensitivity, new_sensitivity)
         new_cellline <- as.character(EdgeRdataframe[RowNumber,1]) #each run of the for loop it stores the cell line name
         CellLineNamesMGMThigh <- c(CellLineNamesMGMThigh, new_cellline) #all cell line names in vector for MGMT high
-        #CellLineNamesMGMThigh does not store cell lines correctly? I'm not sure why
       }
     }else{ #MGMT low
       if (is.na(EdgeRdataframe[RowNumber,ColNumber])){ #skip NAs
@@ -224,13 +223,15 @@ for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
   dgListGlioma <- calcNormFactors(dgListGlioma, method="TMM")
   # Plot 1: MDS
   Colors<-select(as.data.frame(ListofAllDesignMatrices[[DesignMatrixIndex]]),1)
-  Colors[Colors=="1"]<-"green" #resistant
+  Colors[Colors=="1"]<-"blue" #resistant
   Colors[Colors=="0"]<-"red" #sensitive
   png(filename=paste0(sprintf("MDS plot for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus),".png"))
   MDSplots <- plotMDS(dgListGlioma,
                       pch = 20,
                       col=Colors[[1]],
+                      ylim = c(-4, 4),
                       main=sprintf("MDS plot for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus))
+  legend("topleft",c("Resistant", "Sensitive"), pch = c(16,16), col=c("blue","red"))
   dev.off()
   # Estimating Dispersons
   dgListGlioma <- estimateDisp(dgListGlioma, design=ListofAllDesignMatrices[[DesignMatrixIndex]])
@@ -241,22 +242,22 @@ for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
   dev.off()
   # Differential Expression
   fit <- glmFit(dgListGlioma, ListofAllDesignMatrices[[DesignMatrixIndex]]) 
-  lrt <- glmLRT(fit, contrast=c(1,-1))
+  lrt <- glmLRT(fit, contrast=c(1,-1)) 
   edgeR_result <- topTags(lrt, n=Inf, p.value=.001)
   All_DEG <- c(All_DEG,list(edgeR_result$table))
   #plotSmear(lrt, de.tags=deGenes, xlab="Average log CPM", ylab="log-fold-change")
   #abline(h=c(-1, 1), col=2)
   # Plot 3: Volcano
-  lrt$table$diffexpressed <- "NO"
+  lrt$table$diffexpressed <- "No difference"
   lrt$table$FDR <- NA
   lrt$table$FDR <- p.adjust(lrt$table$PValue,method="BH")
-  lrt$table$diffexpressed[lrt$table$logFC > 1 & lrt$table$FDR < 0.001] <- "UP"
-  lrt$table$diffexpressed[lrt$table$logFC < -1 & lrt$table$FDR < 0.001] <- "DOWN"
+  lrt$table$diffexpressed[lrt$table$logFC > 1 & lrt$table$FDR < 0.001] <- "Up for resistant"
+  lrt$table$diffexpressed[lrt$table$logFC < -1 & lrt$table$FDR < 0.001] <- "Down for resistant"
   mycolors <- c("blue", "red", "black")
-  names(mycolors) <- c("DOWN", "UP", "NO")
+  names(mycolors) <- c("Down for resistant", "Up for resistant", "No difference")
   lrt$table$delabel <- NA
-  lrt$table$delabel[lrt$table$diffexpressed != "NO"] <- lrt$genes$Description[lrt$table$diffexpressed != "NO"]
-  LastGene <- length(which(lrt$table$diffexpressed=="DOWN"))+length(which(lrt$table$diffexpressed=="UP"))
+  lrt$table$delabel[lrt$table$diffexpressed != "No difference"] <- lrt$genes$Description[lrt$table$diffexpressed != "No difference"]
+  LastGene <- length(which(lrt$table$diffexpressed=="Down for resistant"))+length(which(lrt$table$diffexpressed=="Up for resistant"))
   Pvalue <- ((lrt$table[order(lrt$table$FDR), ][LastGene,4])+(lrt$table[order(lrt$table$FDR), ][LastGene+1,4]))/2
   volplot <- ggplot(data=lrt$table, mapping = aes(x=logFC, y=-log10(PValue), col=diffexpressed)) +
     geom_point() +
@@ -276,4 +277,10 @@ for(DesignMatrixIndex in 1:length(ListofAllDesignMatrices)){
            colour=Colors[[1]],
            main=sprintf("PCA plot for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus))
   dev.off()
+  for(Row in 1:nrow(lrt$table)){ #adds gene names
+    #print(RNAseqcountsGlioma$Description[which(rownames(lrt$table)[Row]==rownames(RNAseqcountsGlioma))])
+    lrt$table$GeneName[Row] <- RNAseqcountsGlioma$Description[which(rownames(lrt$table)[Row]==rownames(RNAseqcountsGlioma))]
+  }
+  write.csv(lrt$table,paste0(sprintf("Table for %s, %s",names(ListofAllDesignMatrices)[DesignMatrixIndex],MGMTstatus),".csv"))
 }
+
